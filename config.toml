@@ -1,0 +1,38 @@
+[plugin]
+enabled = false
+config_version = "0.1.0"
+
+[knowledge_base]
+# 知识库文件夹路径（相对于插件目录）
+folder_path = "knowledge_base"
+
+# 要读取的文件名
+file_name = "data.txt"
+
+# 使用的 LM 模型（可选：planner, replyer, utils 等系统模型）
+model = "planner"
+
+# 复杂程度提示词（直接传给 LLM）
+detail_prompt = "请以详细的方式描述"
+
+# 缓存文件夹路径（相对于插件目录）
+cache_folder = "cache"
+
+# 是否启用缓存
+enable_cache = true
+
+# LM 超时时间（秒）
+llm_timeout_seconds = 30
+
+[custom_api]
+# 是否使用自定义 API
+enabled = false
+
+# 自定义 API 地址
+api_url = ""
+
+# 自定义 API 密钥
+api_key = ""
+
+# 自定义模型名称
+model = ""

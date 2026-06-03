@@ -1,0 +1,36 @@
+{
+  "manifest_version": 2,
+  "id": "maibot.knowledge-query",
+  "version": "0.1.0",
+  "name": "知识库查询",
+  "description": "基于 LM 的知识库文件检索和内容提取工具",
+  "author": {
+    "name": "clfr41",
+    "url": "https://github.com/clfr41"
+  },
+  "license": "GPL-v3.0-or-later",
+  "urls": {
+    "repository": "https://github.com/clfr41/knowledge-query-plugin",
+    "homepage": "https://github.com/clfr41/knowledge-query-plugin",
+    "documentation": "https://github.com/clfr41/knowledge-query-plugin",
+    "issues": "https://github.com/clfr41/knowledge-query-plugin/issues"
+  },
+  "host_application": {
+    "min_version": "1.0.0",
+    "max_version": "1.0.0"
+  },
+  "sdk": {
+    "min_version": "2.0.0",
+    "max_version": "2.9.9"
+  },
+  "dependencies": [],
+  "capabilities": [
+    "llm.generate",
+    "llm.get_available_models"
+  ],
+  "i18n": {
+    "default_locale": "zh-CN",
+    "locales_path": "_locales",
+    "supported_locales": ["zh-CN"]
+  }
+}
