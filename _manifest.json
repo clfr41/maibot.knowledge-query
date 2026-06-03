@@ -10,10 +10,10 @@
   },
   "license": "GPL-v3.0-or-later",
   "urls": {
-    "repository": "https://github.com/clfr41/knowledge-query-plugin",
-    "homepage": "https://github.com/clfr41/knowledge-query-plugin",
-    "documentation": "https://github.com/clfr41/knowledge-query-plugin",
-    "issues": "https://github.com/clfr41/knowledge-query-plugin/issues"
+    "repository": "https://github.com/clfr41/maibot.knowledge-query",
+    "homepage": "https://github.com/clfr41/maibot.knowledge-query",
+    "documentation": "https://github.com/clfr41/maibot.knowledge-query",
+    "issues": "https://github.com/clfr41/maibot.knowledge-query/issues"
   },
   "host_application": {
     "min_version": "1.0.0",
