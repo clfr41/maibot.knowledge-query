@@ -39,7 +39,6 @@ maibot.knowledge-query/
 
 编辑 `config.toml` 文件：
 
-```toml
 [plugin]
 enabled = true                     # 启用插件
 config_version = "0.1.0"
