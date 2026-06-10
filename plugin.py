@@ -40,7 +40,7 @@ class CustomAPIConfig(PluginConfigBase):
     enabled: bool = Field(default=False, description="是否使用自定义 API")
     api_url: str = Field(default="", description="自定义 API 地址")
     api_key: str = Field(default="", description="自定义 API 密钥")
-    model: str = Field(default="", description="自定义模型名称")  # 修复：补全双引号
+    model: str = Field(default="", description="自定义模型名称")
 
 
 class MyPluginConfig(PluginConfigBase):
@@ -54,6 +54,7 @@ class MyPlugin(MaiBotPlugin):
 
     async def on_load(self) -> None:
         self._plugin_dir = Path(__file__).parent
+        self._write_lock = asyncio.Lock()          # 新增：写锁
         self._ensure_folders()
 
     async def on_unload(self) -> None:
@@ -64,28 +65,23 @@ class MyPlugin(MaiBotPlugin):
         self._ensure_folders()
 
     def _ensure_folders(self) -> None:
-        """确保知识库和缓存文件夹存在"""
         kb_folder = self._plugin_dir / self.config.knowledge_base.folder_path
         cache_folder = self._plugin_dir / self.config.knowledge_base.cache_folder
         kb_folder.mkdir(parents=True, exist_ok=True)
         cache_folder.mkdir(parents=True, exist_ok=True)
 
     def _get_knowledge_file_path(self) -> Path:
-        """获取知识库文件的完整路径"""
         return self._plugin_dir / self.config.knowledge_base.folder_path / self.config.knowledge_base.file_name
 
     def _get_cache_folder_path(self) -> Path:
-        """获取缓存文件夹的完整路径"""
         return self._plugin_dir / self.config.knowledge_base.cache_folder
 
     def _sanitize_filename(self, keyword: str) -> str:
-        """清理关键词作为文件名"""
         import re
         sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', '_', keyword)
         return sanitized[:100]
 
     def _list_cache_files(self) -> list[str]:
-        """列出所有缓存文件的名称（不含扩展名）"""
         cache_folder = self._get_cache_folder_path()
         cache_files = []
         for file in cache_folder.glob("*.json"):
@@ -93,7 +89,6 @@ class MyPlugin(MaiBotPlugin):
         return cache_files
 
     def _read_cache(self, keyword: str) -> str | None:
-        """读取缓存内容"""
         cache_file = self._get_cache_folder_path() / f"{self._sanitize_filename(keyword)}.json"
         if not cache_file.exists():
             return None
@@ -105,22 +100,19 @@ class MyPlugin(MaiBotPlugin):
             self.ctx.logger.warning(f"读取缓存失败: {e}")
             return None
 
-    def _write_cache(self, keyword: str, content: str) -> None:
-        """写入缓存"""
+    async def _write_cache(self, keyword: str, content: str) -> None:
+        """异步写入缓存（受锁保护）"""
         cache_file = self._get_cache_folder_path() / f"{self._sanitize_filename(keyword)}.json"
-        try:
-            with cache_file.open("w", encoding="utf-8") as f:
-                json.dump({"keyword": keyword, "content": content}, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            self.ctx.logger.error(f"写入缓存失败: {e}", exc_info=True)
+        async with self._write_lock:
+            try:
+                with cache_file.open("w", encoding="utf-8") as f:
+                    json.dump({"keyword": keyword, "content": content}, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                self.ctx.logger.error(f"写入缓存失败: {e}", exc_info=True)
 
     async def _call_llm(self, prompt: str) -> dict[str, Any]:
-        """
-        调用 LM，支持系统模型和自定义 API
-        """
         timeout = self.config.knowledge_base.llm_timeout_seconds
 
-        # 如果启用自定义 API
         if self.config.custom_api.enabled:
             if not self.config.custom_api.api_url or not self.config.custom_api.model:
                 return {"success": False, "response": "", "error": "自定义 API 配置不完整"}
@@ -145,7 +137,7 @@ class MyPlugin(MaiBotPlugin):
                     ) as resp:
                         if resp.status == 200:
                             data = await resp.json()
-                            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")  # 修复：空字符串
+                            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
                             return {"success": True, "response": content}
                         else:
                             error_text = await resp.text()
@@ -154,7 +146,6 @@ class MyPlugin(MaiBotPlugin):
                 self.ctx.logger.error(f"自定义 API 调用失败: {e}", exc_info=True)
                 return {"success": False, "response": "", "error": str(e)}
 
-        # 使用系统模型
         try:
             result = await asyncio.wait_for(
                 self.ctx.llm.generate(prompt, self.config.knowledge_base.model),
@@ -168,10 +159,6 @@ class MyPlugin(MaiBotPlugin):
             return {"success": False, "response": "", "error": str(e)}
 
     async def _should_use_cache(self, keyword: str, cache_files: list[str]) -> tuple[bool, str]:
-        """
-        询问 LLM 是否应该使用现有缓存
-        返回: (是否使用缓存, 缓存文件名)
-        """
         if not cache_files:
             return False, ""
 
@@ -197,7 +184,6 @@ class MyPlugin(MaiBotPlugin):
         return False, ""
 
     async def _query_llm(self, keyword: str, content: str) -> str:
-        """调用 LLM 提取相关内容"""
         detail_prompt = self.config.knowledge_base.detail_prompt
         prompt = (
             f"请从以下内容中提取与「{keyword}」相关的信息，并{detail_prompt}：\n\n"
@@ -209,7 +195,7 @@ class MyPlugin(MaiBotPlugin):
 
         result = await self._call_llm(prompt)
         if result.get("success"):
-            return result.get("response", "")  # 修复：空字符串
+            return result.get("response", "")
         return ""
 
     @Tool(
@@ -230,7 +216,6 @@ class MyPlugin(MaiBotPlugin):
         if not keyword:
             return {"name": "knowledge_query", "content": "", "error": "关键词不能为空"}
 
-        # 检查知识库文件是否存在
         kb_file = self._get_knowledge_file_path()
         if not kb_file.exists():
             return {
@@ -239,7 +224,6 @@ class MyPlugin(MaiBotPlugin):
                 "error": f"知识库文件不存在: {self.config.knowledge_base.file_name}"
             }
 
-        # 读取知识库文件内容
         try:
             with kb_file.open("r", encoding="utf-8") as f:
                 file_content = f.read()
@@ -254,7 +238,6 @@ class MyPlugin(MaiBotPlugin):
         if not file_content.strip():
             return {"name": "knowledge_query", "content": "", "error": "知识库文件为空"}
 
-        # 检查缓存
         if self.config.knowledge_base.enable_cache:
             cache_files = self._list_cache_files()
             if cache_files:
@@ -265,10 +248,8 @@ class MyPlugin(MaiBotPlugin):
                         self.ctx.logger.info(f"使用缓存: {cache_name}")
                         return {"name": "knowledge_query", "content": cached_content}
 
-        # 调用 LM 提取内容
         extracted_content = await self._query_llm(keyword, file_content)
 
-        # LM 调用失败，返回原文件内容
         if not extracted_content:
             self.ctx.logger.warning("LM 调用失败，返回原文件内容")
             return {
@@ -277,9 +258,8 @@ class MyPlugin(MaiBotPlugin):
                 "error": "LLM 调用失败，已返回原文件内容"
             }
 
-        # 写入缓存
         if self.config.knowledge_base.enable_cache:
-            self._write_cache(keyword, extracted_content)
+            await self._write_cache(keyword, extracted_content)   # 改为 await
 
         return {"name": "knowledge_query", "content": extracted_content}
 
